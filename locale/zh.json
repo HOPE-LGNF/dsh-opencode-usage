@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "OpenCode Go 用量",
+    "description": "在输入框下方、上下文用量右侧显示一个小图标；点击即可查看 OpenCode Go 套餐的滚动、每周和每月用量。"
+  }
+}

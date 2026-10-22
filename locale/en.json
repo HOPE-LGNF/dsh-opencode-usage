@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "OpenCode Go usage",
+    "description": "Adds a small icon to the right of the composer's context meter; click it to view the OpenCode Go plan's rolling, weekly, and monthly usage."
+  }
+}

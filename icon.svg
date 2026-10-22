@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="OpenCode Go usage">
+  <rect width="64" height="64" rx="14" fill="#eef4fb"/>
+  <path d="M19 45V33M32 45V19M45 45V26" fill="none" stroke="#247bbf" stroke-width="6" stroke-linecap="round"/>
+</svg>

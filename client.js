@@ -6,7 +6,7 @@ window.__ModuleLoader__.load({
     const h = React.createElement
 
     const NS = 'opencode-usage'
-    const ROUTE = '/opencode-go/usage'
+    const ROUTE = 'opencode-go/usage'
     const WINDOWS = ['rolling', 'weekly', 'monthly']
     const PANEL_WIDTH = 264
 
@@ -202,7 +202,7 @@ window.__ModuleLoader__.load({
         setState({ status: 'loading' })
 
         try {
-          const response = await fetch(ROUTE, {
+          const response = await fetch(new URL(ROUTE, document.baseURI), {
             headers: { accept: 'application/json' },
             cache: 'no-store',
             signal: controller.signal,

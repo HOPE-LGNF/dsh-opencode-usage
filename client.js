@@ -121,6 +121,21 @@ window.__ModuleLoader__.load({
       return t('minutes', { minutes: String(minutes) })
     }
 
+    /** Accept only the normalized windows returned by the Host. */
+    function validUsage(usage) {
+      if (usage === null || typeof usage !== 'object' || Array.isArray(usage)) return false
+      return WINDOWS.every((name) => {
+        const value = usage[name]
+        if (value === null) return true
+        if (typeof value !== 'object' || Array.isArray(value)) return false
+        return (
+          (value.status === null || typeof value.status === 'string') &&
+          (value.percent === null || (typeof value.percent === 'number' && Number.isFinite(value.percent))) &&
+          (value.resetsAt === null || typeof value.resetsAt === 'string')
+        )
+      })
+    }
+
     function errorText(state, t) {
       switch (state.code) {
         case 'missing-key':
@@ -218,7 +233,11 @@ window.__ModuleLoader__.load({
             setState({ status: 'error', code: body?.code ?? 'generic', upstreamStatus: body?.status })
             return
           }
-          setState({ status: 'ready', usage: body?.usage ?? {} })
+          if (!validUsage(body?.usage)) {
+            setState({ status: 'error', code: 'invalid-response' })
+            return
+          }
+          setState({ status: 'ready', usage: body.usage })
         } catch {
           if (!mounted.current || controller.signal.aborted) return
           setState({ status: 'error', code: 'network' })

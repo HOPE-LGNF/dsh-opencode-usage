@@ -13,7 +13,7 @@ const ROUTE = '/opencode-go/usage'
 const CREDENTIAL = 'OPENCODE_GO_API_KEY'
 const TIMEOUT_MS = 15000
 
-export const inject = ['webServer', 'credentials']
+export const inject = ['webServer', 'credentials', 'connection']
 
 /** Keep only the documented, JSON-safe fields of one quota window. */
 function normalizeWindow(value) {
@@ -84,15 +84,17 @@ export function apply(ctx) {
         kind: 'exact',
         path: ROUTE,
         handler: async (req, res) => {
-          if (req.method !== 'GET' && req.method !== 'HEAD') {
-            res.setHeader('allow', 'GET, HEAD')
-            sendJson(res, 405, { code: 'method-not-allowed' })
-            return
-          }
-
           let outcome
           try {
-            outcome = await usageOutcome(ctx)
+            const rejection = ctx.connection.requestRejection(req)
+            if (rejection !== undefined) {
+              outcome = { status: rejection, body: { code: rejection === 401 ? 'unauthorized' : 'forbidden' } }
+            } else if (req.method !== 'GET' && req.method !== 'HEAD') {
+              res.setHeader('allow', 'GET, HEAD')
+              outcome = { status: 405, body: { code: 'method-not-allowed' } }
+            } else {
+              outcome = await usageOutcome(ctx)
+            }
           } catch (error) {
             ctx.logger?.warn('opencode-go-usage: query failed: %s', error instanceof Error ? error.message : String(error))
             outcome = { status: 500, body: { code: 'internal' } }

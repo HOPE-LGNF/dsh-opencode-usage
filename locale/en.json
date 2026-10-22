@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "OpenCode Go usage",
-    "description": "Adds a small icon to the right of the composer's context meter; click it to view the OpenCode Go plan's rolling, weekly, and monthly usage."
+    "title": "OpenCode Go / Command Code usage",
+    "description": "Adds a small icon beside the composer's context meter; open it to switch between OpenCode Go usage and Command Code windows and credit balances."
   }
 }

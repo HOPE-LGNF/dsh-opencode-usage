@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "OpenCode Go subscription usage beside the composer context meter",
+  "description": "OpenCode Go and Command Code subscription usage beside the composer context meter",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",

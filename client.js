@@ -6,47 +6,82 @@ window.__ModuleLoader__.load({
     const h = React.createElement
 
     const NS = 'opencode-usage'
-    const ROUTE = 'opencode-go/usage'
+    const SERVICES = {
+      opencode: { name: 'OpenCode', route: 'opencode-go/usage', key: 'OPENCODE_GO_API_KEY' },
+      commandcode: { name: 'Command Code', route: 'command-code/usage', key: 'COMMANDCODE_API_KEY' },
+    }
     const WINDOWS = ['rolling', 'weekly', 'monthly']
+    const COMMAND_WINDOWS = ['fiveHour', 'weekly']
+    const CREDIT_KEYS = ['monthly', 'purchased', 'free']
     const PANEL_WIDTH = 264
 
     const zh = {
-      aria: '查看 OpenCode Go 套餐用量',
-      title: 'OpenCode Go 套餐用量',
+      aria: '查看套餐用量',
+      title: '套餐用量',
+      service: '用量服务',
       rolling: '滚动用量',
+      fiveHour: '5 小时用量',
       weekly: '每周用量',
       monthly: '每月用量',
       used: '{percent}% 已用',
+      creditsUsed: '{used} / {cap} credits',
+      monthlyCredits: '月度余额',
+      purchasedCredits: '已购余额',
+      freeCredits: '免费余额',
+      creditBalance: '{value} credits',
       resets: '{time}后重置',
       resetSoon: '即将重置',
+      resetReached: '重置时间已到，请重新打开获取最新用量',
+      windowExceeded: '此窗口已达上限',
+      emptyWindow: '暂无窗口数据',
+      billingEnds: '当前账期结束',
+      billingUnavailable: '暂时无法获取账期',
       loading: '正在获取用量…',
       empty: '暂无用量数据',
       retry: '重试',
-      errorMissingKey: '未找到 OPENCODE_GO_API_KEY，请先在设置中配置',
-      errorNetwork: '网络请求失败，请检查网络后重试',
-      errorUpstream: 'OpenCode 服务返回 {status}，请稍后再试',
-      errorGeneric: '无法获取用量，请稍后再试',
+      errorMissingKey: '未找到 {key}，请先在设置中配置',
+      errorNetwork: '{service} 用量请求失败，请检查网络后重试',
+      errorUpstream: '{service} 服务返回 {status}，请稍后再试',
+      errorUpstreamAuth: '{service} 上游拒绝了凭据（{status}），请检查设置中的 API Key',
+      errorUnauthorized: 'DSH 登录状态无效，请重新登录后重试',
+      errorForbidden: 'DSH 拒绝访问用量，请检查访问权限后重试',
+      errorGeneric: '无法获取 {service} 用量，请稍后再试',
       days: '{days}天',
       hours: '{hours}小时',
       minutes: '{minutes}分钟',
     }
 
     const en = {
-      aria: 'View OpenCode Go plan usage',
-      title: 'OpenCode Go plan usage',
+      aria: 'View plan usage',
+      title: 'Plan usage',
+      service: 'Usage service',
       rolling: 'Rolling usage',
+      fiveHour: '5-hour usage',
       weekly: 'Weekly usage',
       monthly: 'Monthly usage',
       used: '{percent}% used',
+      creditsUsed: '{used} / {cap} credits',
+      monthlyCredits: 'Monthly balance',
+      purchasedCredits: 'Purchased balance',
+      freeCredits: 'Free balance',
+      creditBalance: '{value} credits',
       resets: 'Resets in {time}',
       resetSoon: 'resetting now',
+      resetReached: 'Reset time reached. Reopen to get the latest usage.',
+      windowExceeded: 'This window has reached its limit.',
+      emptyWindow: 'No window data',
+      billingEnds: 'Current billing period ends',
+      billingUnavailable: 'Billing period is temporarily unavailable.',
       loading: 'Loading usage…',
       empty: 'No usage data',
       retry: 'Retry',
-      errorMissingKey: 'OPENCODE_GO_API_KEY is not configured. Add it in Settings.',
-      errorNetwork: 'Network request failed. Check your connection and retry.',
-      errorUpstream: 'OpenCode returned {status}. Try again shortly.',
-      errorGeneric: 'Could not load usage. Try again shortly.',
+      errorMissingKey: '{key} is not configured. Add it in Settings.',
+      errorNetwork: '{service} usage request failed. Check your connection and retry.',
+      errorUpstream: '{service} returned {status}. Try again shortly.',
+      errorUpstreamAuth: '{service} rejected the upstream credentials ({status}). Check the API key in Settings.',
+      errorUnauthorized: 'Your DSH sign-in is invalid. Sign in again and retry.',
+      errorForbidden: 'DSH denied access to usage. Check your access permissions and retry.',
+      errorGeneric: 'Could not load {service} usage. Try again shortly.',
       days: '{days}d',
       hours: '{hours}h',
       minutes: '{minutes}m',
@@ -65,6 +100,7 @@ window.__ModuleLoader__.load({
       .ou_panel {
         position: fixed; z-index: 1100; box-sizing: border-box;
         width: min(${PANEL_WIDTH}px, calc(100vw - 24px));
+        max-height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain;
         padding: 12px; border: 0; border-radius: var(--dsw-radius-lg);
         background: var(--dsw-specific-menu); backdrop-filter: var(--dsw-menu-backdrop-filter);
         --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
@@ -72,6 +108,20 @@ window.__ModuleLoader__.load({
         color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px;
       }
       .ou_title { color: var(--dsw-alias-label-primary); font-size: 13px; font-weight: 500; line-height: 20px; }
+      .ou_services { display: flex; gap: 6px; margin: 8px 0 6px; }
+      .ou_service {
+        flex: 1; padding: 3px 6px; border: 1px solid var(--dsw-alias-border-l2);
+        border-radius: var(--dsw-radius-sm); background: 0 0; color: var(--dsw-alias-label-tertiary);
+        font: inherit; cursor: pointer;
+      }
+      .ou_service:hover { background: var(--dsw-alias-interactive-bg-hover); }
+      .ou_service[aria-pressed="true"] {
+        border-color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-interactive-bg-hover);
+        color: var(--dsw-alias-label-primary); font-weight: 600;
+      }
+      .ou_trigger:focus-visible, .ou_service:focus-visible, .ou_retry:focus-visible {
+        outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px;
+      }
       .ou_track {
         height: 4px; margin-top: 6px; border-radius: 999px; overflow: hidden;
         background: var(--dsw-alias-interactive-bg-hover);
@@ -136,18 +186,53 @@ window.__ModuleLoader__.load({
       })
     }
 
-    function errorText(state, t) {
+    /** Command Code credits and windows have their own Host contract. */
+    function validCommandUsage(usage) {
+      if (usage === null || typeof usage !== 'object' || Array.isArray(usage)) return false
+      if (!COMMAND_WINDOWS.every((name) => {
+        const value = usage[name]
+        if (value === null) return true
+        if (typeof value !== 'object' || Array.isArray(value)) return false
+        return (
+          typeof value.used === 'number' && Number.isFinite(value.used) && value.used >= 0 &&
+          typeof value.cap === 'number' && Number.isFinite(value.cap) && value.cap > 0 &&
+          typeof value.exceeded === 'boolean' &&
+          (value.resetsAt === null || typeof value.resetsAt === 'string')
+        )
+      })) return false
+
+      const credits = usage.credits
+      if (credits === null || typeof credits !== 'object' || Array.isArray(credits)) return false
+      if (!CREDIT_KEYS.every((name) => credits[name] === null || (
+        typeof credits[name] === 'number' && Number.isFinite(credits[name])
+      ))) return false
+
+      const billing = usage.billing
+      return billing !== null && typeof billing === 'object' && !Array.isArray(billing) &&
+        ['available', 'none', 'unavailable'].includes(billing.status) &&
+        (billing.periodEndsAt === null || typeof billing.periodEndsAt === 'string')
+    }
+
+    function errorText(state, service, t) {
+      const values = { service: SERVICES[service].name }
       switch (state.code) {
         case 'missing-key':
-          return t('errorMissingKey')
+          return t('errorMissingKey', { key: SERVICES[service].key })
         case 'network':
-          return t('errorNetwork')
+          return t('errorNetwork', values)
+        case 'unauthorized':
+          return t('errorUnauthorized')
+        case 'forbidden':
+          return t('errorForbidden')
         case 'upstream':
+          if (state.upstreamStatus === 401 || state.upstreamStatus === 403) {
+            return t('errorUpstreamAuth', { ...values, status: String(state.upstreamStatus) })
+          }
           return state.upstreamStatus === undefined
-            ? t('errorGeneric')
-            : t('errorUpstream', { status: String(state.upstreamStatus) })
+            ? t('errorGeneric', values)
+            : t('errorUpstream', { ...values, status: String(state.upstreamStatus) })
         default:
-          return t('errorGeneric')
+          return t('errorGeneric', values)
       }
     }
 
@@ -172,17 +257,96 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function PanelBody({ state, t, reload }) {
+    function formatCredits(value) {
+      return value === null ? '—' : value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    }
+
+    function CommandUsageRow({ name, entry, t }) {
+      if (entry === null) {
+        return h(
+          'div',
+          { className: 'ou_row' },
+          h('div', null, t(name)),
+          h('div', { className: 'ou_hint' }, t('emptyWindow')),
+        )
+      }
+
+      const percent = Math.round(entry.used / entry.cap * 100)
+      const bounded = Math.max(0, Math.min(100, percent))
+      const resetAt = typeof entry.resetsAt === 'string' ? Date.parse(entry.resetsAt) : NaN
+      const resetText = !Number.isFinite(resetAt)
+        ? null
+        : resetAt <= Date.now()
+          ? t('resetReached')
+          : t('resets', { time: resetDistance(entry.resetsAt, t) })
+      return h(
+        'div',
+        { className: 'ou_row' },
+        h(
+          'div',
+          { className: 'ou_line' },
+          h('span', null, t(name)),
+          h('span', { className: 'ou_value' }, t('used', { percent: String(percent) })),
+        ),
+        h(
+          'div',
+          { className: 'ou_track', role: 'progressbar', 'aria-label': t(name), 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': bounded },
+          h('div', { className: 'ou_fill', style: { width: `${bounded}%` } }),
+        ),
+        h('div', { className: 'ou_hint' }, t('creditsUsed', { used: formatCredits(entry.used), cap: formatCredits(entry.cap) })),
+        entry.exceeded ? h('div', { className: 'ou_hint' }, t('windowExceeded')) : null,
+        resetText === null ? null : h('div', { className: 'ou_hint' }, resetText),
+      )
+    }
+
+    function CommandBody({ usage, t, reload }) {
+      const billingAt = usage.billing.status === 'available' && typeof usage.billing.periodEndsAt === 'string'
+        ? Date.parse(usage.billing.periodEndsAt)
+        : NaN
+      const billingUnavailable = usage.billing.status === 'unavailable' || (
+        usage.billing.status === 'available' && !Number.isFinite(billingAt)
+      )
+      return h(
+        React.Fragment,
+        null,
+        COMMAND_WINDOWS.map((name) => h(CommandUsageRow, { key: name, name, entry: usage[name], t })),
+        CREDIT_KEYS.map((name) => h(
+          'div',
+          { key: name, className: 'ou_row ou_line' },
+          h('span', null, t(`${name}Credits`)),
+          h('span', { className: 'ou_value' }, usage.credits[name] === null ? '—' : t('creditBalance', { value: formatCredits(usage.credits[name]) })),
+        )),
+        Number.isFinite(billingAt)
+          ? h(
+              'div',
+              { className: 'ou_row' },
+              h('div', null, t('billingEnds')),
+              h('div', { className: 'ou_hint' }, new Date(billingAt).toLocaleString()),
+            )
+          : null,
+        billingUnavailable
+          ? h(
+              'div',
+              { className: 'ou_row' },
+              h('div', { className: 'ou_muted' }, t('billingUnavailable')),
+              h('button', { type: 'button', className: 'ou_retry', onClick: reload }, t('retry')),
+            )
+          : null,
+      )
+    }
+
+    function PanelBody({ state, service, t, reload }) {
       if (state.status !== 'ready') {
         if (state.status !== 'error') return h('div', { className: 'ou_muted' }, t('loading'))
         return h(
           'div',
           null,
-          h('div', { className: 'ou_muted' }, errorText(state, t)),
+          h('div', { className: 'ou_muted' }, errorText(state, service, t)),
           h('button', { type: 'button', className: 'ou_retry', onClick: reload }, t('retry')),
         )
       }
 
+      if (service === 'commandcode') return h(CommandBody, { usage: state.usage, t, reload })
       const usage = state.usage !== null && typeof state.usage === 'object' ? state.usage : {}
       const windows = WINDOWS.filter((name) => {
         const value = usage[name]
@@ -194,6 +358,7 @@ window.__ModuleLoader__.load({
 
     function UsageButton({ t }) {
       const [open, setOpen] = React.useState(false)
+      const [service, setService] = React.useState('opencode')
       const [state, setState] = React.useState({ status: 'idle' })
       const [position, setPosition] = React.useState(null)
       const mounted = React.useRef(true)
@@ -207,6 +372,7 @@ window.__ModuleLoader__.load({
         return () => {
           mounted.current = false
           request.current?.abort()
+          request.current = null
         }
       }, [])
 
@@ -217,7 +383,7 @@ window.__ModuleLoader__.load({
         setState({ status: 'loading' })
 
         try {
-          const response = await fetch(new URL(ROUTE, document.baseURI), {
+          const response = await fetch(new URL(SERVICES[service].route, document.baseURI), {
             headers: { accept: 'application/json' },
             cache: 'no-store',
             signal: controller.signal,
@@ -228,21 +394,38 @@ window.__ModuleLoader__.load({
           } catch {
             body = undefined
           }
-          if (!mounted.current || controller.signal.aborted) return
+          if (!mounted.current || controller.signal.aborted || request.current !== controller) return
           if (!response.ok) {
-            setState({ status: 'error', code: body?.code ?? 'generic', upstreamStatus: body?.status })
+            const code = body?.code ?? (response.status === 401 ? 'unauthorized' : response.status === 403 ? 'forbidden' : 'generic')
+            setState({ status: 'error', code, upstreamStatus: body?.status })
             return
           }
-          if (!validUsage(body?.usage)) {
+          const valid = service === 'commandcode' ? validCommandUsage(body?.usage) : validUsage(body?.usage)
+          if (!valid) {
             setState({ status: 'error', code: 'invalid-response' })
             return
           }
           setState({ status: 'ready', usage: body.usage })
         } catch {
-          if (!mounted.current || controller.signal.aborted) return
+          if (!mounted.current || controller.signal.aborted || request.current !== controller) return
           setState({ status: 'error', code: 'network' })
         }
+      }, [service])
+
+      const close = React.useCallback(() => {
+        request.current?.abort()
+        request.current = null
+        setState({ status: 'idle' })
+        setOpen(false)
       }, [])
+
+      const selectService = (next) => {
+        if (next === service) return
+        request.current?.abort()
+        request.current = null
+        setState({ status: 'loading' })
+        setService(next)
+      }
 
       React.useEffect(() => {
         if (open) {
@@ -250,6 +433,7 @@ window.__ModuleLoader__.load({
           return
         }
         request.current?.abort()
+        request.current = null
         setPosition(null)
       }, [open, reload])
 
@@ -259,9 +443,13 @@ window.__ModuleLoader__.load({
           const rect = triggerRef.current?.getBoundingClientRect()
           if (rect === undefined) return
           const maxLeft = Math.max(12, window.innerWidth - PANEL_WIDTH - 12)
+          const above = rect.top - 20
+          const below = window.innerHeight - rect.bottom - 20
           setPosition({
             left: Math.max(12, Math.min(rect.left, maxLeft)),
-            bottom: Math.max(8, window.innerHeight - rect.top + 8),
+            ...(above >= below
+              ? { bottom: Math.max(8, window.innerHeight - rect.top + 8), maxHeight: Math.max(0, above) }
+              : { top: Math.max(12, rect.bottom + 8), maxHeight: Math.max(0, below) }),
           })
         }
         place()
@@ -275,10 +463,10 @@ window.__ModuleLoader__.load({
           const target = event.target
           if (rootRef.current?.contains(target) === true) return
           if (panelRef.current?.contains(target) === true) return
-          setOpen(false)
+          close()
         }
         const onKeyDown = (event) => {
-          if (event.key === 'Escape') setOpen(false)
+          if (event.key === 'Escape') close()
         }
         document.addEventListener('pointerdown', onPointerDown)
         document.addEventListener('keydown', onKeyDown)
@@ -286,7 +474,7 @@ window.__ModuleLoader__.load({
           document.removeEventListener('pointerdown', onPointerDown)
           document.removeEventListener('keydown', onKeyDown)
         }
-      }, [open])
+      }, [open, close])
 
       const panel = open
         ? ReactDom.createPortal(
@@ -300,7 +488,16 @@ window.__ModuleLoader__.load({
                 style: position ?? { visibility: 'hidden', left: 0, bottom: 0 },
               },
               h('div', { className: 'ou_title' }, t('title')),
-              h(PanelBody, { state, t, reload }),
+              h(
+                'div',
+                { className: 'ou_services', role: 'group', 'aria-label': t('service') },
+                Object.keys(SERVICES).map((name) => h(
+                  'button',
+                  { key: name, type: 'button', className: 'ou_service', 'aria-pressed': service === name, onClick: () => selectService(name) },
+                  SERVICES[name].name,
+                )),
+              ),
+              h(PanelBody, { state, service, t, reload }),
             ),
             document.body,
           )
@@ -320,7 +517,7 @@ window.__ModuleLoader__.load({
             'aria-haspopup': 'dialog',
             'aria-expanded': open,
             title: t('aria'),
-            onClick: () => setOpen((value) => !value),
+            onClick: () => open ? close() : setOpen(true),
           },
           h(
             'svg',

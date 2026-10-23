@@ -6,7 +6,8 @@ DSH Web 插件：在消息输入框下方、上下文用量指示器的右侧显
 
 - Host 端通过 `ctx.credentials` 读取与 `opencode-go` LLM 路由相同的 `OPENCODE_GO_API_KEY`。
 - 请求 `GET https://opencode.ai/zen/go/v1/usage`，只把 `rolling`、`weekly`、`monthly` 三个窗口的 `status`、`percent`、`resetsAt` 返回给浏览器，密钥不进入浏览器。
-- 浏览器请求同源路由 `GET /opencode-go/usage`，Host 端把缺失密钥、网络错误、上游错误等映射为带 `code` 的 JSON，前端据此显示可重试的错误提示。
+- 浏览器请求同源路由 `GET /opencode-go/usage`，携带已有的 DSH 会话 Cookie。Host 通过 `connection` 检查会话及 Host/Origin，通过后才读取 OpenCode 密钥并查询上游。
+- 获取用量失败时，弹层会显示错误提示和“重试”按钮；请求成功但没有可显示的用量时，会显示“暂无用量数据”。
 
 ## 文件
 
@@ -30,12 +31,17 @@ dsh plugin --profile <name> add "link:/path/to/dsh-opencode-usage"
 
 profile 重算后 DSH 会热加载 Host 与 Client 两半。
 
+支持部署在 `/dsh/` 等子路径下，用量请求会沿用该路径前缀。使用反向代理时，需按 DSH 的部署要求配置前缀剥除。
+
 ## 验证
 
-`DSH_WEB_URL` 是当前 DSH Web GUI 地址：
+先打开 DSH Web GUI 并完成登录，在该页面的开发者工具控制台中执行：
 
-```sh
-curl -s "$DSH_WEB_URL/opencode-go/usage"
+```js
+const response = await fetch(new URL('opencode-go/usage', document.baseURI), { cache: 'no-store' })
+console.log(response.status, await response.json())
 ```
 
-返回 `{"usage":{...}}` 表示 Host 半已生效；`curl "$DSH_WEB_URL/plugins/events"` 的 `graph` 中出现 `@local/dsh-opencode-usage` 表示 Client 半已进入页面模块图。
+返回 `200` 和 `{"usage":{...}}` 表示 Host 已成功取得并校验用量。`401 / unauthorized` 表示 DSH 会话未通过认证，`403 / forbidden` 表示 Host/Origin 被拒绝；`401 / missing-key` 则表示 DSH 认证已通过，但尚未配置 `OPENCODE_GO_API_KEY`。不携带 DSH 认证信息的裸 `curl` 请求不能用于验证查询成功。
+
+点击输入框下方的用量图标，确认弹层能显示用量。使用子路径部署时，可在浏览器开发者工具的 Network 面板中检查请求地址是否保留了路径前缀，例如 `/dsh/`。

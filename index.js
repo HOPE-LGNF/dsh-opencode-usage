@@ -10,18 +10,22 @@
 
 const USAGE_URL = 'https://opencode.ai/zen/go/v1/usage'
 const ROUTE = '/opencode-go/usage'
+const WINDOWS = ['rolling', 'weekly', 'monthly']
 const CREDENTIAL = 'OPENCODE_GO_API_KEY'
 const TIMEOUT_MS = 15000
 
-export const inject = ['webServer', 'credentials']
+export const inject = ['webServer', 'credentials', 'connection']
 
-/** Keep only the documented, JSON-safe fields of one quota window. */
+/** Keep known window fields; null means absent, undefined means malformed. */
 function normalizeWindow(value) {
-  if (value === null || typeof value !== 'object') return null
-  const percent = typeof value.percent === 'number' && Number.isFinite(value.percent) ? value.percent : null
-  const status = typeof value.status === 'string' ? value.status : null
-  const resetsAt = typeof value.resetsAt === 'string' ? value.resetsAt : null
-  return { status, percent, resetsAt }
+  if (value === undefined || value === null) return null
+  if (typeof value !== 'object' || Array.isArray(value)) return undefined
+  if (!['status', 'percent', 'resetsAt'].some((name) => Object.hasOwn(value, name))) return undefined
+  const { status, percent, resetsAt } = value
+  if (status !== undefined && status !== null && typeof status !== 'string') return undefined
+  if (percent !== undefined && percent !== null && (typeof percent !== 'number' || !Number.isFinite(percent))) return undefined
+  if (resetsAt !== undefined && resetsAt !== null && typeof resetsAt !== 'string') return undefined
+  return { status: status ?? null, percent: percent ?? null, resetsAt: resetsAt ?? null }
 }
 
 /** Query upstream usage and map every outcome to a status plus JSON body. */
@@ -52,20 +56,17 @@ async function usageOutcome(ctx) {
   }
 
   const usage = body !== null && typeof body === 'object' && body.usage !== undefined ? body.usage : body
-  if (usage === null || typeof usage !== 'object') {
+  if (usage === null || typeof usage !== 'object' || Array.isArray(usage) || !WINDOWS.some((name) => Object.hasOwn(usage, name))) {
     return { status: 502, body: { code: 'invalid-response' } }
   }
 
-  return {
-    status: 200,
-    body: {
-      usage: {
-        rolling: normalizeWindow(usage.rolling),
-        weekly: normalizeWindow(usage.weekly),
-        monthly: normalizeWindow(usage.monthly),
-      },
-    },
+  const normalized = {}
+  for (const name of WINDOWS) {
+    const window = normalizeWindow(usage[name])
+    if (window === undefined) return { status: 502, body: { code: 'invalid-response' } }
+    normalized[name] = window
   }
+  return { status: 200, body: { usage: normalized } }
 }
 
 /** Answer with JSON and no caching: quota values are live facts. */
@@ -84,15 +85,17 @@ export function apply(ctx) {
         kind: 'exact',
         path: ROUTE,
         handler: async (req, res) => {
-          if (req.method !== 'GET' && req.method !== 'HEAD') {
-            res.setHeader('allow', 'GET, HEAD')
-            sendJson(res, 405, { code: 'method-not-allowed' })
-            return
-          }
-
           let outcome
           try {
-            outcome = await usageOutcome(ctx)
+            const rejection = ctx.connection.requestRejection(req)
+            if (rejection !== undefined) {
+              outcome = { status: rejection, body: { code: rejection === 401 ? 'unauthorized' : 'forbidden' } }
+            } else if (req.method !== 'GET' && req.method !== 'HEAD') {
+              res.setHeader('allow', 'GET, HEAD')
+              outcome = { status: 405, body: { code: 'method-not-allowed' } }
+            } else {
+              outcome = await usageOutcome(ctx)
+            }
           } catch (error) {
             ctx.logger?.warn('opencode-go-usage: query failed: %s', error instanceof Error ? error.message : String(error))
             outcome = { status: 500, body: { code: 'internal' } }
